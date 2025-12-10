@@ -48,7 +48,7 @@ export const Home: React.FC<HomeProps> = ({
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="mb-6">
-              <img src="/src/images/IMG_1060.PNG" alt="Cultura Shop" className="w-[550px] h-auto mx-auto mb-4" />
+              <img src="/IMG_1060.PNG" alt="Cultura Shop" className="w-[550px] h-auto mx-auto mb-4" />
             </div>
             <p className="text-xl md:text-2xl mb-[60px] text-blue-100">
               Приходи к нам в Урам парк или заказывай прямо сейчас!

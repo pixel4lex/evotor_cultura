@@ -54,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center"
             >
               <img
-                src="/src/images/IMG_1060.PNG"
+                src="/IMG_1060.PNG"
                 alt="Cultura Shop"
                 className="h-10 w-auto"
               />
