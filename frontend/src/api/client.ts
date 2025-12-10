@@ -1,4 +1,8 @@
-const DEFAULT_BASE_URL = 'http://localhost:8000';
+let HOST = window.location.hostname;
+if (HOST.includes('localhost')) {
+  HOST = 'localhost:8000';
+}
+export const DEFAULT_BASE_URL = `http://${HOST}`;
 
 const rawBaseUrl = (import.meta.env?.VITE_API_BASE_URL ?? DEFAULT_BASE_URL) as string;
 const sanitizedBaseUrl = rawBaseUrl.replace(/\/$/, '');
