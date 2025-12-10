@@ -1,0 +1,119 @@
+from typing import Any, Dict
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.app.db import supabase
+from backend.app.models import (
+    AuthResult,
+    SignInPayload,
+    SignUpPayload,
+    TokenBundle,
+    UpdateProfilePayload,
+)
+from backend.app.services.auth_service import current_user
+from backend.app.services.db_service import to_dict
+
+router = APIRouter(prefix="", tags=["auth"])
+
+
+@router.post("/signup", response_model=AuthResult)
+def sign_up(payload: SignUpPayload) -> AuthResult:
+    try:
+        auth_response = supabase.auth.sign_up(
+            {
+                "email": payload.email,
+                "password": payload.password,
+                "options": {
+                    "data": {
+                        "full_name": payload.full_name,
+                        "phone": payload.phone,
+                        "addresses": [],
+                    }
+                },
+            }
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    session_dict = to_dict(auth_response.session)
+    user_dict = to_dict(auth_response.user)
+
+    if not session_dict:
+        raise HTTPException(
+            status_code=500
+        )
+
+    tokens = TokenBundle(
+        access_token=session_dict.get("access_token"),
+        refresh_token=session_dict.get("refresh_token"),
+    )
+
+    return AuthResult(message="Регистрация прошла успешно.", session=tokens, user=user_dict)
+
+
+@router.post("/login", response_model=AuthResult)
+def sign_in(payload: SignInPayload) -> AuthResult:
+    try:
+        auth_response = supabase.auth.sign_in_with_password(
+            {"email": payload.email, "password": payload.password}
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Неверный адрес электронной почты или пароль.") from exc
+
+    session_dict = to_dict(auth_response.session)
+    user_dict = to_dict(auth_response.user)
+
+    if not session_dict:
+        raise HTTPException(status_code=401, detail="Ошибка входа.")
+
+    tokens = TokenBundle(
+        access_token=session_dict.get("access_token"),
+        refresh_token=session_dict.get("refresh_token"),
+    )
+
+    return AuthResult(message="Вход выполнен успешно.", session=tokens, user=user_dict)
+
+
+@router.get("/me")
+async def me(user: Dict[str, Any] = Depends(current_user)) -> Dict[str, Any]:
+    return {"user": user}
+
+
+@router.patch("/me", response_model=AuthResult)
+async def update_me(
+    payload: UpdateProfilePayload,
+    user: Dict[str, Any] = Depends(current_user),
+) -> AuthResult:
+    if not user:
+        raise HTTPException(status_code=401, detail="Пользователь не найден.")
+
+    updates: Dict[str, Any] = {}
+    metadata = dict(user.get("user_metadata") or {})
+
+    if payload.full_name is not None:
+        metadata["full_name"] = payload.full_name
+    if payload.phone is not None:
+        metadata["phone"] = payload.phone
+    if payload.addresses is not None:
+        metadata["addresses"] = [address.model_dump() for address in payload.addresses]
+
+    if metadata != (user.get("user_metadata") or {}):
+        updates["user_metadata"] = metadata
+
+    if payload.email is not None and payload.email != user.get("email"):
+        updates["email"] = payload.email
+
+    if payload.password is not None:
+        updates["password"] = payload.password
+
+    if not updates:
+        return AuthResult(message="Изменений не обнаружено.", session=None, user=user)
+
+    try:
+        supabase.auth.admin.update_user_by_id(user["id"], updates)
+        refreshed = supabase.auth.admin.get_user_by_id(user["id"])
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    updated_user = to_dict(refreshed.user)
+
+    return AuthResult(message="Профиль обновлен.", session=None, user=updated_user)
